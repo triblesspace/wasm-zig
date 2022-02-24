@@ -491,6 +491,17 @@ pub const Memory = opaque {
         return wasm_memory_same(self, other);
     }
 
+    /// Returns a pointer to the given datatype.
+    ///
+    pub fn get(self: *Memory, comptime T: type, addr: usize) !*T {
+        const mem = wasm_memory_data(self);
+        const mem_size = wasm_memory_data_size(self);
+        if ((addr + @sizeOf(T)) > mem_size) {
+            return error.OutOfBounds;
+        }
+        return @ptrCast(*T, @alignCast(@alignOf(T), &mem[addr]));
+    }
+
     /// Returns a pointer-to-many bytes
     ///
     /// Tip: Use toSlice() to get a slice for better ergonomics
