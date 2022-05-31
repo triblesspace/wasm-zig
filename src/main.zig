@@ -170,19 +170,25 @@ pub const Func = opaque {
     /// Tries to call the wasm function
     /// expects `args` to be tuple of arguments
     pub fn call(self: *Func, comptime ResultType: type, args: anytype) CallError!ResultType {
-        if (!comptime trait.isTuple(@TypeOf(args)))
+        const ArgsType = @TypeOf(args);
+
+        if (!comptime trait.isTuple(ArgsType))
             @compileError("Expected 'args' to be a tuple, but found type '" ++ @typeName(@TypeOf(args)) ++ "'");
 
+        const args_type_info = @typeInfo(ArgsType);
+        const fields_info = args_type_info.Struct.fields;
+
         const args_len = args.len;
-        comptime var wasm_args: [args_len]Value = undefined;
-        inline for (wasm_args) |*arg, i| {
-            arg.* = switch (@TypeOf(args[i])) {
-                i32, u32 => .{ .kind = .i32, .of = .{ .i32 = @bitCast(i32, args[i]) } },
-                i64, u64 => .{ .kind = .i64, .of = .{ .i64 = @bitCast(i64, args[i]) } },
-                f32 => .{ .kind = .f32, .of = .{ .f32 = args[i] } },
-                f64 => .{ .kind = .f64, .of = .{ .f64 = args[i] } },
-                *Func => .{ .kind = .funcref, .of = .{ .ref = args[i] } },
-                *Extern => .{ .kind = .anyref, .of = .{ .ref = args[i] } },
+        var wasm_args: [args_len]Value = undefined;
+        inline for (fields_info) |field_info, i| {
+            const arg = @field(args, field_info.name);
+            wasm_args[i] = switch (@TypeOf(arg)) {
+                i32, u32 => .{ .kind = .i32, .of = .{ .i32 = @bitCast(i32, arg) } },
+                i64, u64 => .{ .kind = .i64, .of = .{ .i64 = @bitCast(i64, arg) } },
+                f32 => .{ .kind = .f32, .of = .{ .f32 = arg } },
+                f64 => .{ .kind = .f64, .of = .{ .f64 = arg } },
+                *Func => .{ .kind = .funcref, .of = .{ .ref = arg } },
+                *Extern => .{ .kind = .anyref, .of = .{ .ref = arg } },
                 else => |ty| @compileError("Unsupported argument type '" ++ @typeName(ty) + "'"),
             };
         }
